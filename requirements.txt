@@ -7,3 +7,7 @@ chromadb
 langchain-chroma
 python-dotenv
 numpy
+langchain-groq
+streamlit
+pypdf
+python-docx
