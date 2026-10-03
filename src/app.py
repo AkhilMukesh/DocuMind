@@ -3,8 +3,18 @@ from pathlib import Path
 import tempfile
 
 from rag_pipeline import ask_question
-from ingestion import ingest_document
+from ingestion import (
+    ingest_document,
+    delete_document_completely
+)
+from document_registry import get_documents
 
+from document_registry import (
+    initialize_database,
+    get_documents
+)
+
+initialize_database()
 
 # --------------------------------------------------
 # Page configuration
@@ -69,20 +79,27 @@ with st.sidebar:
                             temporary_file.name
                         )
 
-                    document_count, chunk_count = (
-                        ingest_document(
-                            temporary_path
-                        )
+                    result = ingest_document(
+                        temporary_path,
+                        uploaded_file.name
                     )
 
-                st.success(
-                    "Document processed successfully!"
-                )
+                if result["status"] == "duplicate":
 
-                st.info(
-                    f"Loaded documents: {document_count}\n\n"
-                    f"Created chunks: {chunk_count}"
-                )
+                    st.warning(
+                        "This document has already been uploaded."
+                    )
+
+                else:
+                    st.success(
+                        "Document processed successfully!"
+                    )
+
+                    st.write(
+                        f"Chunks created: "
+                        f"{result['chunk_count']}"
+                    )
+
 
             except Exception as error:
 
@@ -92,6 +109,110 @@ with st.sidebar:
 
                 st.exception(error)
 
+    st.divider()
+    st.subheader("Indexed Documents")
+
+documents = get_documents()
+
+document_options = {
+    document[1]: document[0]
+    for document in documents
+}
+selected_document = st.selectbox(
+    "Search within",
+    options=[
+        "All documents"
+    ] + list(document_options.keys())
+)
+
+selected_document_id = None
+
+if selected_document != "All documents":
+
+    selected_document_id = document_options[
+        selected_document
+    ]
+
+
+if not documents:
+
+    st.info(
+        "No documents have been indexed yet."
+    )
+
+else:
+
+    for document in documents:
+
+        document_id = document[0]
+        filename = document[1]
+        file_type = document[2]
+        chunk_count = document[3]
+        uploaded_at = document[4]
+
+        with st.expander(filename):
+
+            st.write(
+                f"Type: {file_type}"
+            )
+
+            st.write(
+                f"Chunks: {chunk_count}"
+            )
+
+            st.write(
+                f"Uploaded: {uploaded_at}"
+            )
+
+            st.caption(
+                f"Document ID: {document_id}"
+            )
+
+            if st.button(
+                "Delete Document",
+                key=f"delete_{document_id}"
+            ):
+
+                try:
+
+                    with st.spinner(
+                        "Deleting document..."
+                    ):
+
+                        result = (
+                            delete_document_completely(
+                                document_id
+                            )
+                        )
+
+                    if result["status"] == "success":
+
+                        st.success(
+                            f"{filename} was deleted."
+                        )
+
+                        st.rerun()
+
+                    elif result["status"] == "not_found":
+
+                        st.warning(
+                            "Document was not found."
+                        )
+
+                    else:
+
+                        st.error(
+                            "Failed to delete document."
+                        )
+
+                except Exception as error:
+
+                    st.error(
+                        "An error occurred while deleting "
+                        "the document."
+                    )
+
+                    st.exception(error)
 
 # --------------------------------------------------
 # Question
@@ -103,7 +224,7 @@ st.subheader("Ask DocuMind")
 question = st.text_input(
     "Your question",
     placeholder=(
-        "Example: How many days can employees "
+        "Example: Ask....."
         "work remotely?"
     )
 )
@@ -130,7 +251,8 @@ if st.button("Ask DocuMind"):
             ):
 
                 answer, sources = ask_question(
-                    question
+                    question,
+                    document_id=selected_document_id
                 )
 
             st.subheader("Answer")
@@ -143,14 +265,23 @@ if st.button("Ask DocuMind"):
 
                 for source in sources:
 
+                    st.markdown(
+                        f"**{source['citation']} "
+                        f"{source['location']}**"
+        )
+
+                    with st.expander(
+                     "View retrieved evidence"
+        ):
+
+                        st.write(
+                        source["content"]
+                        )
+
+                else:
+
                     st.write(
-                        f"📄 {source}"
-                    )
-
-            else:
-
-                st.write(
-                    "No sources found."
+                     "No sources found."
                 )
 
         except Exception as error:
