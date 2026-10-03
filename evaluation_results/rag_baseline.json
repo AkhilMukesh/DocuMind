@@ -1,0 +1,9 @@
+{
+    "created_at": "2026-10-03T14:56:26.509891",
+    "metrics": {
+        "semantic_correctness": 0.6,
+        "faithfulness": 0.4,
+        "citation_correctness": 0.8,
+        "citation_completeness": 0.6
+    }
+}

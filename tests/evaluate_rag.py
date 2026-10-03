@@ -1,4 +1,5 @@
 from pathlib import Path
+from regression_baseline import save_baseline
 import sys
 
 
@@ -149,8 +150,27 @@ def evaluate():
             f"Citation Completeness: {completeness_result}"
         )
 
+        # ------------------------------------------------------
+    # Calculate overall metrics
     # ------------------------------------------------------
-    # Overall Results
+
+    results = {
+        "semantic_correctness": (
+            semantic_correct / total
+        ),
+        "faithfulness": (
+            faithful / total
+        ),
+        "citation_correctness": (
+            citation_correct / total
+        ),
+        "citation_completeness": (
+            citation_complete / total
+        )
+    }
+
+    # ------------------------------------------------------
+    # Print Overall Results
     # ------------------------------------------------------
 
     print()
@@ -160,25 +180,31 @@ def evaluate():
 
     print(
         f"Semantic Correctness : "
-        f"{semantic_correct / total:.2%}"
+        f"{results['semantic_correctness']:.2%}"
     )
 
     print(
         f"Faithfulness         : "
-        f"{faithful / total:.2%}"
+        f"{results['faithfulness']:.2%}"
     )
 
     print(
         f"Citation Correctness : "
-        f"{citation_correct / total:.2%}"
+        f"{results['citation_correctness']:.2%}"
     )
 
     print(
         f"Citation Completeness: "
-        f"{citation_complete / total:.2%}"
+        f"{results['citation_completeness']:.2%}"
     )
 
     print("=" * 70)
+
+    # ------------------------------------------------------
+    # Save regression baseline
+    # ------------------------------------------------------
+
+    save_baseline(results)
 
 
 if __name__ == "__main__":
