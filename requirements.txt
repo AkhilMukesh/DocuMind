@@ -11,3 +11,6 @@ langchain-groq
 streamlit
 pypdf
 python-docx
+pytest
+docx2txt
+reportlab
