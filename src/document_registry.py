@@ -1,7 +1,9 @@
 import sqlite3
 from pathlib import Path
 from datetime import datetime
+import logging
 
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -54,20 +56,20 @@ def add_document(
     content_hash,
     chunk_count
 ):
+    logger.info(
+        "Registering document | document_id=%s | filename=%s | chunks=%s",
+        document_id,
+        filename,
+        chunk_count
+    )
 
     connection = get_connection()
-
     cursor = connection.cursor()
 
     cursor.execute(
         """
         INSERT INTO documents (
-            id,
-            filename,
-            file_type,
-            content_hash,
-            chunk_count,
-            uploaded_at
+            id, filename, file_type, content_hash, chunk_count, uploaded_at
         )
         VALUES (?, ?, ?, ?, ?, ?)
         """,
@@ -83,6 +85,11 @@ def add_document(
 
     connection.commit()
     connection.close()
+
+    logger.info(
+        "Document registered successfully | document_id=%s",
+        document_id
+    )
 
 
 # --------------------------------------------------

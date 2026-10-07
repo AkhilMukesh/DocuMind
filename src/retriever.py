@@ -1,13 +1,13 @@
 from pathlib import Path
-
+import logging
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
 
-
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------
-# Project paths
+# Project paths this
 # --------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -61,17 +61,21 @@ def create_retriever(document_id=None):
 # Retrieve documents
 # --------------------------------------------------
 
-def retrieve_documents(
-    query,
-    document_id=None
-):
+def retrieve_documents(query, document_id=None):
+    logger.info("Retrieval started")
 
     retriever = create_retriever(
         document_id=document_id
     )
 
-    return retriever.invoke(query)
+    documents = retriever.invoke(query)
 
+    logger.info(
+        "Retrieval completed | result_count=%s",
+        len(documents)
+    )
+
+    return documents
 
 # --------------------------------------------------
 # Local development test

@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 
@@ -265,27 +268,43 @@ def build_sources(documents):
 # ============================================================
 
 def ask_question(question, document_id=None):
-    """
-    Execute the complete RAG pipeline.
+    logger.info("RAG question processing started")
 
-    Flow:
+    documents = retrieve_documents(
+        question,
+        document_id=document_id
+    )
 
-        Question
-            ↓
-        Retriever
-            ↓
-        Relevant Documents
-            ↓
-        Context
-            ↓
-        RAG Prompt
-            ↓
-        LLM
-            ↓
-        Answer
-            ↓
-        Sources
-    """
+    logger.info(
+        "Document retrieval completed | result_count=%s",
+        len(documents)
+    )
+
+    context = format_documents(documents)
+
+    messages = rag_prompt.invoke(
+        {
+            "context": context,
+            "question": question
+        }
+    )
+
+    logger.info("LLM request started")
+
+    response = llm.invoke(messages)
+
+    logger.info("LLM request completed")
+
+    answer = StrOutputParser().invoke(response)
+
+    sources = build_sources(documents)
+
+    logger.info(
+        "RAG question processing completed | source_count=%s",
+        len(sources)
+    )
+
+    return answer, sources
 
     # --------------------------------------------------------
     # 1. Retrieve documents

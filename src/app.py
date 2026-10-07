@@ -1,6 +1,13 @@
 import streamlit as st
 from pathlib import Path
 import tempfile
+import logging
+
+from logging_config import configure_logging
+
+configure_logging()
+
+logger = logging.getLogger(__name__)
 
 from rag_pipeline import ask_question
 from ingestion import (
