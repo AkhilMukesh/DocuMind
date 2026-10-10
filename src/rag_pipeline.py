@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 import logging
-
+import time
+from metrics import metrics
 logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
@@ -11,6 +12,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from request_context import (
+    set_request_id,
+    reset_request_id,
+    get_request_id,
+)
 
 
 # ============================================================
@@ -144,24 +150,56 @@ def create_retriever(document_id=None):
 # RETRIEVE DOCUMENTS
 # ============================================================
 
+
 def retrieve_documents(question, document_id=None):
-    """
-    Retrieve relevant documents without calling the LLM.
+    start_time = time.perf_counter()
+    metrics.increment("retrieval.started")
 
-    Used by:
-    - Retrieval evaluation
-    - Debugging
-    - Testing
-    - RAG pipeline
-    """
+    try:
+        active_retriever = create_retriever(
+            document_id=document_id
+        )
 
-    active_retriever = create_retriever(
-        document_id=document_id
-    )
+        documents = active_retriever.invoke(question)
 
-    documents = active_retriever.invoke(question)
+        elapsed_seconds = time.perf_counter() - start_time
 
-    return documents
+        metrics.increment("retrieval.success")
+        metrics.increment(
+            "retrieval.documents_returned",
+            len(documents)
+        )
+        metrics.observe_duration(
+            "retrieval.duration_seconds",
+            elapsed_seconds
+        )
+
+        logger.info(
+            "Retrieval completed | request_id=%s "
+            "| result_count=%s | duration_seconds=%.3f",
+            get_request_id() or "-",
+            len(documents),
+            elapsed_seconds
+        )
+
+        return documents
+
+    except Exception:
+        elapsed_seconds = time.perf_counter() - start_time
+
+        metrics.increment("retrieval.failure")
+        metrics.observe_duration(
+            "retrieval.duration_seconds",
+            elapsed_seconds
+        )
+
+        logger.exception(
+            "Retrieval failed | request_id=%s "
+            "| duration_seconds=%.3f",
+            get_request_id() or "-",
+            elapsed_seconds
+        )
+        raise
 
 
 # ============================================================
@@ -267,102 +305,115 @@ def build_sources(documents):
 # MAIN RAG PIPELINE
 # ============================================================
 
+
 def ask_question(question, document_id=None):
-    logger.info("RAG question processing started")
+    request_id, token = set_request_id()
 
-    documents = retrieve_documents(
-        question,
-        document_id=document_id
-    )
+    metrics.increment("rag.request.started")
 
     logger.info(
-        "Document retrieval completed | result_count=%s",
-        len(documents)
+        "RAG question processing started | request_id=%s",
+        request_id
     )
 
-    context = format_documents(documents)
+    try:
+        documents = retrieve_documents(
+            question,
+            document_id=document_id
+        )
 
-    messages = rag_prompt.invoke(
-        {
-            "context": context,
-            "question": question
-        }
-    )
+        metrics.increment("retrieval.success")
+        metrics.increment(
+            "retrieval.documents_returned",
+            len(documents)
+        )
 
-    logger.info("LLM request started")
+        logger.info(
+            "Document retrieval completed | request_id=%s "
+            "| result_count=%s",
+            request_id,
+            len(documents)
+        )
 
-    response = llm.invoke(messages)
+        context = format_documents(documents)
 
-    logger.info("LLM request completed")
+        messages = rag_prompt.invoke(
+            {
+                "context": context,
+                "question": question
+            }
+        )
 
-    answer = StrOutputParser().invoke(response)
+        start_time = time.perf_counter()
+        metrics.increment("llm.request.started")
 
-    sources = build_sources(documents)
+        logger.info(
+            "LLM request started | request_id=%s",
+            request_id
+        )
 
-    logger.info(
-        "RAG question processing completed | source_count=%s",
-        len(sources)
-    )
+        try:
+            response = llm.invoke(messages)
 
-    return answer, sources
+        except Exception:
+            elapsed_seconds = time.perf_counter() - start_time
 
-    # --------------------------------------------------------
-    # 1. Retrieve documents
-    # --------------------------------------------------------
+            metrics.increment("llm.request.failure")
+            metrics.observe_duration(
+                "llm.request.duration_seconds",
+                elapsed_seconds
+            )
 
-    documents = retrieve_documents(
-        question,
-        document_id=document_id
-    )
+            logger.exception(
+                "LLM request failed | request_id=%s "
+                "| duration_seconds=%.3f",
+                request_id,
+                elapsed_seconds
+            )
+            raise
 
-    # --------------------------------------------------------
-    # 2. Build context
-    # --------------------------------------------------------
+        elapsed_seconds = time.perf_counter() - start_time
 
-    context = format_documents(
-        documents
-    )
+        metrics.increment("llm.request.success")
+        metrics.observe_duration(
+            "llm.request.duration_seconds",
+            elapsed_seconds
+        )
 
-    # --------------------------------------------------------
-    # 3. Build prompt
-    # --------------------------------------------------------
+        logger.info(
+            "LLM request completed | request_id=%s "
+            "| duration_seconds=%.3f",
+            request_id,
+            elapsed_seconds
+        )
 
-    messages = rag_prompt.invoke(
-        {
-            "context": context,
-            "question": question
-        }
-    )
+        answer = StrOutputParser().invoke(response)
+        sources = build_sources(documents)
 
-    # --------------------------------------------------------
-    # 4. Call LLM
-    # --------------------------------------------------------
+        metrics.increment("rag.request.success")
 
-    response = llm.invoke(
-        messages
-    )
+        logger.info(
+            "RAG question processing completed | request_id=%s "
+            "| source_count=%s",
+            request_id,
+            len(sources)
+        )
 
-    # --------------------------------------------------------
-    # 5. Parse answer
-    # --------------------------------------------------------
+        return answer, sources
 
-    answer = StrOutputParser().invoke(
-        response
-    )
+    except Exception:
+        metrics.increment("rag.request.failure")
 
-    # --------------------------------------------------------
-    # 6. Build sources
-    # --------------------------------------------------------
+        logger.exception(
+            "RAG question processing failed | request_id=%s",
+            request_id
+        )
+        raise
 
-    sources = build_sources(
-        documents
-    )
+    finally:
+        reset_request_id(token)
 
-    # --------------------------------------------------------
-    # 7. Return
-    # --------------------------------------------------------
 
-    return answer, sources
 
 
 def answer_question_with_documents(question, document_id=None):

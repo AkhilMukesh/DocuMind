@@ -2,6 +2,12 @@ import hashlib
 import uuid
 from pathlib import Path
 
+import logging
+import time
+from metrics import metrics
+
+logger = logging.getLogger(__name__)
+
 from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
@@ -96,7 +102,7 @@ def load_document(file_path):
         raise ValueError(
             f"Unsupported file type: {extension}"
         )
-
+    
     return loader.load()
 
 
@@ -120,85 +126,167 @@ def split_documents(documents):
 # Ingest document
 # --------------------------------------------------
 
-def ingest_document(file_path, original_filename):
 
-    content_hash = calculate_file_hash(
-        file_path
+def ingest_document(file_path, original_filename):
+    start_time = time.perf_counter()
+    metrics.increment("ingestion.started")
+    file_path = Path(file_path)
+
+    logger.info(
+        "Document ingestion started | filename=%s",
+        original_filename
     )
 
-    # ----------------------------------------------
-    # Duplicate check
-    # ----------------------------------------------
+    try:
+        # ----------------------------------------------
+        # Calculate file hash
+        # ----------------------------------------------
 
-    if document_exists(content_hash):
+        content_hash = calculate_file_hash(file_path)
 
-        return {
-            "status": "duplicate",
-            "filename": original_filename
-        }
-
-    # ----------------------------------------------
-    # Load
-    # ----------------------------------------------
-
-    documents = load_document(file_path)
-
-    # ----------------------------------------------
-    # Chunk
-    # ----------------------------------------------
-
-    chunks = split_documents(documents)
-
-    # ----------------------------------------------
-    # Create document ID
-    # ----------------------------------------------
-
-    document_id = str(uuid.uuid4())
-
-    # ----------------------------------------------
-    # Add document ID to metadata
-    # ----------------------------------------------
-
-    for chunk in chunks:
-
-        chunk.metadata["document_id"] = document_id
-
-        chunk.metadata["filename"] = (
+        logger.info(
+            "Document hash calculated | filename=%s",
             original_filename
         )
 
-    # ----------------------------------------------
-    # Vector database
-    # ----------------------------------------------
+        # ----------------------------------------------
+        # Duplicate check
+        # ----------------------------------------------
 
-    vector_store = Chroma(
-        collection_name="company_policy",
-        embedding_function=embeddings,
-        persist_directory=str(CHROMA_PATH)
-    )
+        if document_exists(content_hash):
+            elapsed_seconds = time.perf_counter() - start_time
 
-    vector_store.add_documents(
-        chunks
-    )
+            logger.info(
+                "Document ingestion skipped | reason=duplicate "
+                "| filename=%s | duration_seconds=%.3f",
+                original_filename,
+                elapsed_seconds
+            )
+            metrics.increment("ingestion.duplicate")
+            metrics.observe_duration(
+                "ingestion.duration_seconds",
+                    elapsed_seconds
+            )
+            return {
+                "status": "duplicate",
+                "filename": original_filename
+            }
 
-    # ----------------------------------------------
-    # Save document registry record
-    # ----------------------------------------------
+        # ----------------------------------------------
+        # Load document
+        # ----------------------------------------------
 
-    add_document(
-        document_id=document_id,
-        filename=original_filename,
-        file_type=file_path.suffix.lower(),
-        content_hash=content_hash,
-        chunk_count=len(chunks)
-    )
+        documents = load_document(file_path)
 
-    return {
-        "status": "success",
-        "filename": original_filename,
-        "document_id": document_id,
-        "chunk_count": len(chunks)
-    }
+        logger.info(
+            "Document loading completed | filename=%s "
+            "| page_or_document_count=%s",
+            original_filename,
+            len(documents)
+        )
+
+        # ----------------------------------------------
+        # Chunk document
+        # ----------------------------------------------
+
+        chunks = split_documents(documents)
+
+        logger.info(
+            "Document chunking completed | filename=%s "
+            "| chunk_count=%s",
+            original_filename,
+            len(chunks)
+        )
+
+        # ----------------------------------------------
+        # Create document ID
+        # ----------------------------------------------
+
+        document_id = str(uuid.uuid4())
+
+        # ----------------------------------------------
+        # Add document ID and filename to metadata
+        # ----------------------------------------------
+
+        for chunk in chunks:
+            chunk.metadata["document_id"] = document_id
+            chunk.metadata["filename"] = original_filename
+
+        # ----------------------------------------------
+        # Store chunks in Chroma
+        # ----------------------------------------------
+
+        vector_store = Chroma(
+            collection_name="company_policy",
+            embedding_function=embeddings,
+            persist_directory=str(CHROMA_PATH)
+        )
+
+        vector_store.add_documents(chunks)
+
+        logger.info(
+            "Vector storage completed | filename=%s "
+            "| document_id=%s | chunk_count=%s",
+            original_filename,
+            document_id,
+            len(chunks)
+        )
+
+        # ----------------------------------------------
+        # Register document in SQLite
+        # ----------------------------------------------
+
+        add_document(
+            document_id=document_id,
+            filename=original_filename,
+            file_type=file_path.suffix.lower(),
+            content_hash=content_hash,
+            chunk_count=len(chunks)
+        )
+
+        # Log success only after registry registration
+        elapsed_seconds = time.perf_counter() - start_time
+
+
+        logger.info(
+            "Document ingestion completed | filename=%s "
+            "| document_id=%s | chunk_count=%s "
+            "| duration_seconds=%.3f",
+            original_filename,
+            document_id,
+            len(chunks),
+            elapsed_seconds
+        )
+        metrics.increment("ingestion.success")
+        metrics.observe_duration(
+             "ingestion.duration_seconds",
+             elapsed_seconds
+        )
+        return {
+            "status": "success",
+            "filename": original_filename,
+            "document_id": document_id,
+            "chunk_count": len(chunks)
+        }
+
+    except Exception:
+        elapsed_seconds = time.perf_counter() - start_time
+        metrics.increment("ingestion.failure")
+        metrics.observe_duration(
+        "ingestion.duration_seconds",
+         elapsed_seconds
+        )
+
+        logger.exception(
+            "Document ingestion failed | filename=%s "
+            "| duration_seconds=%.3f",
+            original_filename,
+            elapsed_seconds
+        )
+
+        # Preserve existing error propagation.
+        raise
+
 
 def delete_document_completely(document_id):
 

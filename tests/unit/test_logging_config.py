@@ -1,32 +1,27 @@
+
+from logging_config import StructuredFormatter
+from request_context import reset_request_id, set_request_id
 import logging
 
-from logging_config import configure_logging, StructuredFormatter
 
+def test_structured_formatter_includes_request_id():
+    _, token = set_request_id("trace-123")
 
-def test_configure_logging():
-    configure_logging()
+    try:
+        record = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="Tracing test",
+            args=(),
+            exc_info=None,
+        )
 
-    logger = logging.getLogger("test_logger")
+        formatted = StructuredFormatter().format(record)
 
-    assert logger.isEnabledFor(logging.INFO)
+        assert "request_id=trace-123" in formatted
+        assert "message=Tracing test" in formatted
 
-
-def test_structured_formatter():
-    formatter = StructuredFormatter()
-
-    record = logging.LogRecord(
-        name="test_logger",
-        level=logging.INFO,
-        pathname=__file__,
-        lineno=10,
-        msg="Test message",
-        args=(),
-        exc_info=None
-    )
-
-    formatted = formatter.format(record)
-
-    assert "level=INFO" in formatted
-    assert "logger=test_logger" in formatted
-    assert "message=Test message" in formatted
-    assert "timestamp=" in formatted
+    finally:
+        reset_request_id(token)

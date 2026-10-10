@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -61,21 +62,47 @@ def create_retriever(document_id=None):
 # Retrieve documents
 # --------------------------------------------------
 
+
 def retrieve_documents(query, document_id=None):
-    logger.info("Retrieval started")
+    start_time = time.perf_counter()
 
-    retriever = create_retriever(
-        document_id=document_id
-    )
-
-    documents = retriever.invoke(query)
+    filter_status = "enabled" if document_id else "disabled"
 
     logger.info(
-        "Retrieval completed | result_count=%s",
-        len(documents)
+        "Retrieval started | document_filter=%s",
+        filter_status
     )
 
-    return documents
+    try:
+        retriever = create_retriever(
+            document_id=document_id
+        )
+
+        documents = retriever.invoke(query)
+
+        elapsed_seconds = time.perf_counter() - start_time
+
+        logger.info(
+            "Retrieval completed | result_count=%s "
+            "| document_filter=%s | duration_seconds=%.3f",
+            len(documents),
+            filter_status,
+            elapsed_seconds
+        )
+
+        return documents
+
+    except Exception:
+        elapsed_seconds = time.perf_counter() - start_time
+
+        logger.exception(
+            "Retrieval failed | document_filter=%s "
+            "| duration_seconds=%.3f",
+            filter_status,
+            elapsed_seconds
+        )
+        raise
+
 
 # --------------------------------------------------
 # Local development test
