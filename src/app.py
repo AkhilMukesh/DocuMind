@@ -2,7 +2,8 @@ import streamlit as st
 from pathlib import Path
 import tempfile
 import logging
-
+from upload_security import validate_upload, UploadValidationError
+from upload_security import validate_question
 from logging_config import configure_logging
 
 configure_logging()
@@ -59,62 +60,29 @@ with st.sidebar:
         type=["pdf", "txt", "docx"]
     )
 
-    if uploaded_file is not None:
+    
+if uploaded_file is not None and st.button("Ingest document"):
+    try:
+        file_bytes = uploaded_file.getvalue()
 
-        if st.button("Process Document", type="primary"):
+        validate_upload(
+            uploaded_file.name,
+            file_bytes
+        )
 
-            try:
+        # Keep your existing ingestion call and arguments.
+        ingest_document(uploaded_file)
 
-                with st.spinner(
-                    "Processing document..."
-                ):
+        st.success("Document ingested successfully.")
 
-                    suffix = Path(
-                        uploaded_file.name
-                    ).suffix
+    except UploadValidationError as exc:
+        st.error(str(exc))
 
-                    with tempfile.NamedTemporaryFile(
-                        delete=False,
-                        suffix=suffix
-                    ) as temporary_file:
+    except Exception:
+        # Log the exception server-side using your existing logger.
+        # Do not display internal tracebacks or secrets to the user.
+        st.error("Document ingestion failed. Please try again.")
 
-                        temporary_file.write(
-                            uploaded_file.getbuffer()
-                        )
-
-                        temporary_path = Path(
-                            temporary_file.name
-                        )
-
-                    result = ingest_document(
-                        temporary_path,
-                        uploaded_file.name
-                    )
-
-                if result["status"] == "duplicate":
-
-                    st.warning(
-                        "This document has already been uploaded."
-                    )
-
-                else:
-                    st.success(
-                        "Document processed successfully!"
-                    )
-
-                    st.write(
-                        f"Chunks created: "
-                        f"{result['chunk_count']}"
-                    )
-
-
-            except Exception as error:
-
-                st.error(
-                    "Failed to process the document."
-                )
-
-                st.exception(error)
 
     st.divider()
     st.subheader("Indexed Documents")
@@ -256,9 +224,9 @@ if st.button("Ask DocuMind"):
             with st.spinner(
                 "Searching documents..."
             ):
-
+                safe_question = validate_question(question)
                 answer, sources = ask_question(
-                    question,
+                    safe_question,
                     document_id=selected_document_id
                 )
 
