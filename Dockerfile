@@ -1,4 +1,3 @@
-```dockerfile
 FROM python:3.9-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -33,4 +32,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)" || exit 1
 
 CMD ["streamlit", "run", "src/app.py", "--server.headless=true"]
-```
