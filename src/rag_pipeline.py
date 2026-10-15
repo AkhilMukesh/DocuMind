@@ -1,24 +1,24 @@
 import os
-from pathlib import Path
 import logging
 import time
-from metrics import metrics
-logger = logging.getLogger(__name__)
+from pathlib import Path
 from functools import lru_cache
-from embedding_config import get_embeddings
-from dotenv import load_dotenv
 
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
+from dotenv import load_dotenv
+from metrics import metrics
 from embedding_config import get_embeddings
-from langchain_chroma import Chroma
+from storage_config import CHROMA_PATH
 from request_context import (
     set_request_id,
     reset_request_id,
     get_request_id,
 )
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_groq import ChatGroq
+from langchain_chroma import Chroma
 
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # PROJECT PATHS
