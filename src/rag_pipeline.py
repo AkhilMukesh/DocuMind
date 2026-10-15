@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import logging
 import time
-from turtle import st
 from metrics import metrics
 logger = logging.getLogger(__name__)
 from functools import lru_cache
