@@ -9,7 +9,7 @@ from langchain_groq import ChatGroq
 # --------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
+from storage_config import CHROMA_PATH
 load_dotenv(PROJECT_ROOT / ".env")
 
 # --------------------------------------------------

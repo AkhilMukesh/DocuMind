@@ -1,0 +1,16 @@
+
+services:
+  - type: web
+    name: documind-ai
+    runtime: docker
+    plan: starter
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: DOCUMIND_DATA_DIR
+        value: /var/data
+      - key: GROQ_API_KEY
+        sync: false
+    disk:
+      name: documind-data
+      mountPath: /var/data
+      sizeGB: 1

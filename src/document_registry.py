@@ -6,8 +6,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-DATABASE_PATH = PROJECT_ROOT / "documind.db"
+from storage_config import DATABASE_PATH
+#DATABASE_PATH = PROJECT_ROOT / "documind.db"
 
 
 # --------------------------------------------------

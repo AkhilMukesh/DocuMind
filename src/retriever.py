@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-CHROMA_PATH = PROJECT_ROOT / "chroma_db"
+from storage_config import CHROMA_PATH
 
 
 # --------------------------------------------------

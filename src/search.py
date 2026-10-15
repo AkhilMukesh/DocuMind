@@ -6,8 +6,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 policy_path = Path(__file__).resolve().parents[1] / "data" / "company_policy.txt"
-
-CHROMA_PATH = Path(__file__).resolve().parents[1] / "chroma_db"
+from storage_config import CHROMA_PATH
+#   CHROMA_PATH = Path(__file__).resolve().parents[1] / "chroma_db"
 
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"

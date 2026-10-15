@@ -17,7 +17,7 @@ from evaluation_dataset import evaluation_dataset
 # --------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CHROMA_PATH = PROJECT_ROOT / "chroma_db"
+from storage_config import CHROMA_PATH
 
 load_dotenv(PROJECT_ROOT / ".env")
 

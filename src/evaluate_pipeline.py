@@ -6,7 +6,8 @@ from langchain_chroma import Chroma
 from evaluation_dataset import evaluation_dataset
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CHROMA_PATH = PROJECT_ROOT / "chroma_db"
+from storage_config import CHROMA_PATH
+#   CHROMA_PATH = PROJECT_ROOT / "chroma_db"
 
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"    

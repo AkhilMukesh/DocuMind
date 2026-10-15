@@ -7,8 +7,8 @@ from langchain_chroma import Chroma
 
 
 policy_path = Path(__file__).resolve().parents[1] / "data" / "company_policy.txt"
-
-CHROMA_PATH = Path(__file__).resolve().parents[1] / "chroma_db"
+from storage_config import CHROMA_PATH
+#   CHROMA_PATH = Path(__file__).resolve().parents[1] / "chroma_db"
 
 
 #1. load documents
