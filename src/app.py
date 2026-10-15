@@ -62,27 +62,45 @@ with st.sidebar:
 
     
 if uploaded_file is not None and st.button("Ingest document"):
+    logger.info(
+        "Document ingestion requested: filename=%s, size_bytes=%s",
+        uploaded_file.name,
+        uploaded_file.size,
+    )
+
     try:
         file_bytes = uploaded_file.getvalue()
 
         validate_upload(
             uploaded_file.name,
-            file_bytes
+            file_bytes,
         )
 
-        # Keep your existing ingestion call and arguments.
-        ingest_document(uploaded_file)
+        with st.spinner("Ingesting document..."):
+            ingest_document(uploaded_file)
 
+        logger.info(
+            "Document ingestion succeeded: filename=%s",
+            uploaded_file.name,
+        )
         st.success("Document ingested successfully.")
 
     except UploadValidationError as exc:
+        logger.warning(
+            "Document upload validation failed: filename=%s, reason=%s",
+            uploaded_file.name,
+            str(exc),
+        )
         st.error(str(exc))
 
     except Exception:
-        # Log the exception server-side using your existing logger.
-        # Do not display internal tracebacks or secrets to the user.
-        st.error("Document ingestion failed. Please try again.")
-
+        logger.exception(
+            "Document ingestion failed: filename=%s",
+            uploaded_file.name,
+        )
+        st.error(
+            "Document ingestion failed. Check the application logs."
+        )
 
     st.divider()
     st.subheader("Indexed Documents")
