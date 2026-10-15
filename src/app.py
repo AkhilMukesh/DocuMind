@@ -77,7 +77,10 @@ if uploaded_file is not None and st.button("Ingest document"):
         )
 
         with st.spinner("Ingesting document..."):
-            ingest_document(uploaded_file)
+            ingest_document(
+            uploaded_file,
+            original_filename=uploaded_file.name,
+        )
 
         logger.info(
             "Document ingestion succeeded: filename=%s",
