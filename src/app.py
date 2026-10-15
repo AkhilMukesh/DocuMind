@@ -98,9 +98,7 @@ if uploaded_file is not None and st.button("Ingest document"):
             "Document ingestion failed: filename=%s",
             uploaded_file.name,
         )
-        st.error(
-            "Document ingestion failed. Check the application logs."
-        )
+        st.exception(__import__("sys").exc_info()[1])
 
     st.divider()
     st.subheader("Indexed Documents")
