@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 import time
 from metrics import metrics
+from embedding_config import get_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +36,9 @@ from storage_config import CHROMA_PATH
 # Embeddings
 # --------------------------------------------------
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+# embeddings = HuggingFaceEmbeddings(
+#     model_name="sentence-transformers/all-MiniLM-L6-v2"
+# )
 
 
 # --------------------------------------------------
@@ -214,6 +215,7 @@ def ingest_document(file_path, original_filename):
         # ----------------------------------------------
         # Store chunks in Chroma
         # ----------------------------------------------
+        embeddings = get_embeddings()
 
         vector_store = Chroma(
             collection_name="company_policy",
@@ -296,7 +298,7 @@ def delete_document_completely(document_id):
         return {
             "status": "not_found"
         }
-
+    embeddings = get_embeddings()
     vector_store = Chroma(
         collection_name="company_policy",
         embedding_function=embeddings,

@@ -2,15 +2,17 @@ import os
 from pathlib import Path
 import logging
 import time
+from turtle import st
 from metrics import metrics
 logger = logging.getLogger(__name__)
-
+from functools import lru_cache
+from embedding_config import get_embeddings
 from dotenv import load_dotenv
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
+from embedding_config import get_embeddings
 from langchain_chroma import Chroma
 from request_context import (
     set_request_id,
@@ -44,22 +46,27 @@ if not os.getenv("GROQ_API_KEY"):
 # EMBEDDINGS
 # ============================================================
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
 
 
 # ============================================================
 # VECTOR DATABASE
 # ============================================================
 
-vector_store = Chroma(
-    collection_name="company_policy",
-    embedding_function=embeddings,
-    persist_directory=str(CHROMA_PATH)
-)
+# vector_store = Chroma(
+#     collection_name="company_policy",
+#     embedding_function=embeddings,
+#     persist_directory=str(CHROMA_PATH)
+# )
 
 
+@lru_cache(maxsize=1)
+def get_vector_store():
+    """Create and reuse one Chroma vector store per process."""
+    return Chroma(
+        collection_name="company_policy",
+        embedding_function=get_embeddings(),
+        persist_directory=str(CHROMA_PATH),
+    )
 # ============================================================
 # LLM
 # ============================================================
@@ -126,22 +133,17 @@ def create_retriever(document_id=None):
 
     If document_id is provided, retrieval is restricted
     to that document.
-
-    Otherwise, all indexed documents can be searched.
     """
-
-    search_kwargs = {
-        "k": 2
-    }
+    search_kwargs = {"k": 2}
 
     if document_id:
         search_kwargs["filter"] = {
             "document_id": document_id
         }
 
-    return vector_store.as_retriever(
+    return get_vector_store().as_retriever(
         search_type="similarity",
-        search_kwargs=search_kwargs
+        search_kwargs=search_kwargs,
     )
 
 
